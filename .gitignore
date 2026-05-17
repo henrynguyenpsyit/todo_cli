@@ -12,5 +12,5 @@ env/
 # OS
 Thumbs.db
 .DS_Store
-# Data
+# Data (sẽ dùng ở G14.2 khi có Json nhạy cảm)
 *.log
