@@ -62,7 +62,10 @@ def main():
         print(f"Bạn chọn {choice}")
 
         if choice == "Thêm task":
-            name = input("Tên task: ")
+            name = input("Tên task: ").strip()
+            if not name:
+                print("Tên task không được rỗng!")
+                continue
             add_task(name, tasks)
             save_task(tasks)
 
