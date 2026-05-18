@@ -1,4 +1,10 @@
 import questionary
+import json
+import os
+
+
+FOLDER = os.path.dirname(os.path.abspath(__file__))
+PATH = os.path.join(FOLDER,"todo.json")
 
 
 def add_task(name, tasks):
@@ -27,9 +33,20 @@ def delete_task(index, tasks):
         return tasks.pop(index - 1)
     return None
 
+def save_task(tasks):
+    with open(PATH, "w", encoding="utf-8") as f:
+        json.dump(tasks, f, ensure_ascii=False, indent=2)
 
-def main ():
-    tasks = []
+def load_tasks():
+    try:
+        with open(PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+    
+
+def main():
+    tasks = load_tasks()
     while True:
         choice = questionary.select(
         "____TO-DO LIST____",
@@ -47,6 +64,7 @@ def main ():
         if choice == "Thêm task":
             name = input("Tên task: ")
             add_task(name, tasks)
+            save_task(tasks)
 
         elif choice == "Xem task":
             list_tasks(tasks)
@@ -61,6 +79,7 @@ def main ():
             confirm = questionary.confirm(f"Bạn chắc chắn muốn xoá?").ask()
             if confirm:
                 deleted = delete_task(idx, tasks)
+                save_task(tasks)
                 if deleted:
                     print(f"Đã xoá {deleted['name']}")
                 else:
@@ -78,6 +97,7 @@ def main ():
             done_mark = mark_done(mark, tasks)
             if done_mark:
                 print(f"{done_mark['name']} đã hoàn thành")
+                save_task(tasks)
             else:
                 print(f"Số thứ tự không hợp lệ. Chỉ có {len(tasks)} task")
         elif choice == "Thoát":
