@@ -22,16 +22,20 @@ def add_task(name, tasks, target, unit):
     tasks.append({"name": name, "target": target, "current": 0, "unit": unit})
 
 
+def progress_bar(current, target):
+    LENGTH = 20
+    filled = int(current / target * LENGTH)
+    filled = min(filled, LENGTH)
+    return "█" * filled + "░" * (LENGTH - filled)
+
+
 def list_tasks(tasks):
     """In ra tất cả task kèm số thứ tự và trạng thái"""
-    LENGTH = 20
     for i, t in enumerate(tasks, 1):
         current = t["current"]
         target = t["target"]
         unit = t["unit"]
-        filled = int(current / target * LENGTH)
-        filled = min(filled, LENGTH)
-        bar = "█" * filled + "░" * (LENGTH - filled)
+        bar = progress_bar(current, target)
         done = current >= target
         tick = "✓" if done else " "
         print(f"{i}. {tick} {t['name']} - {current} / {target} {unit} ({bar})")
@@ -41,13 +45,6 @@ def update_progress(task, amount):
     """Đánh dấu task[index] là hoàn thành"""
     task["current"] += amount
     return task
-        
-
-def delete_task(index, tasks):
-    """Trả về task đã xoá, hoặc None nếu Index sai"""
-    if 0 < index <= len(tasks):
-        return tasks.pop(index - 1)
-    return None
 
 
 def migrate(tasks):
@@ -71,7 +68,7 @@ def load_tasks():
 ADD = "Thêm task"
 LIST = "Xem task"
 UPDATE = "Cập nhật tiến độ"
-DEL = "Xoá task"
+EDIT = "Quản lý task"
 EXIT = "Thoát"
 
 
@@ -84,8 +81,8 @@ def main():
         choices=[
             ADD,
             LIST,
+            EDIT,
             UPDATE,
-            DEL,
             EXIT
             ],
         style = custom_style,
@@ -110,45 +107,91 @@ def main():
         elif choice == LIST:
             list_tasks(tasks)
 
-        elif choice == DEL:
-            list_tasks(tasks)
-            try:
-                idx = int(input("Nhập số thứ tự muốn xoá: "))
-            except ValueError:
-                print("Số không hợp lệ!")
-                continue
-            confirm = questionary.confirm(f"Bạn chắc chắn muốn xoá?").ask()
-            if confirm:
-                deleted = delete_task(idx, tasks)
+
+        elif choice == EDIT:
+            while True:
+                chosen = questionary.select(
+                    "Chọn task để hiệu chỉnh:",
+                    choices = [Choice(f"{t['name']} {t['current']} / {t['target']} {t['unit']} {progress_bar(t['current'], t['target'])}", value=t) for t in tasks] + 
+                    [Choice("↩️ Quay lại", value="back")]
+                ).ask()
+                if chosen == 'back' or chosen is None:
+                    break
+                elif chosen:
+                    while True:
+                        action = questionary.select(
+                            "Quản lý task",
+                            choices = [
+                                Choice("Chỉnh sửa tên", value="name"),
+                                Choice("Chỉnh sửa mục tiêu", value="target"),
+                                Choice("Chỉnh sửa đơn vị", value="unit"),
+                                Choice("Xoá task", value="del"),
+                                Choice("↩️ Quay lại", value="exit")]
+                            ).ask()
+                        if action == "name":
+                            new_name = questionary.text(
+                                "Nhập tên mới: "
+                            ).ask()
+                            if new_name is None:
+                                continue
+                            else:
+                                new_name = new_name.strip()
+                                chosen['name'] = new_name
+                        elif action == "target":
+                            new_target = questionary.text(
+                                "Nhập mục tiêu mới: ",
+                                validate = lambda s: True if s.isdigit() and int(s) > 0 else "Phải nhập số lớn hơn 0"
+                            ).ask()
+                            if new_target is None:
+                                continue
+                            else:
+                                new_target = int(new_target)
+                                chosen['target'] = new_target
+                        elif action == "unit":
+                            new_unit = questionary.text(
+                                "Nhập đơn vị mới: "
+                            ).ask()
+                            if new_unit is None:
+                                continue
+                            else:
+                                new_unit = new_unit.strip()
+                                chosen['unit'] = new_unit
+                        elif action == "del":
+                            confirm = questionary.confirm(f"Bạn chắc chắn muốn xoá?").ask()
+                            if confirm:
+                                tasks.remove(chosen)
+                                print(f"Đã xoá {chosen['name']}")
+                                break
+                            else:
+                                print("Huỷ xoá")
+                        else:
+                            break
                 save_task(tasks)
-                if deleted:
-                    print(f"Đã xoá {deleted['name']}")
-                else:
-                    print(f"Số thứ tự không hợp lệ. Chỉ có {len(tasks)} task!")
-            else:
-                print("Huỷ xoá")
                 
+
         elif choice == UPDATE:
-            chosen = questionary.select(
-                "Chọn task để cập nhật:",
-                choices = [Choice(f"{t['name']} {t['current']} / {t['target']}", value=t) for t in tasks]
-            ).ask()
-            if chosen:
+            while True:
+                chosen = questionary.select(
+                    "Chọn task để cập nhật:",
+                    choices = [Choice(f"{t['name']} {t['current']} / {t['target']} {t['unit']} {progress_bar(t['current'], t['target'])}", value=t) for t in tasks] + 
+                        [Choice("↩️ Quay lại", value="back")]
+                ).ask()
+                if chosen == 'back' or chosen is None:
+                    break
                 amount = questionary.text(
                 "Đã làm thêm: ",
                 validate=lambda s: True if s.isdigit() and int(s) > 0 else "Hãy nhập số lớn hơn 0" 
             ).ask()
-                amount = int(amount)
-                update_progress(chosen, amount)
-                print(f"{chosen['name']} đã cập nhật: {chosen['current']} / {chosen['target']}")
-                save_task(tasks)
-
+                if amount is None:
+                    continue
+                else:
+                    amount = int(amount)
+                    update_progress(chosen, amount)
+                    print(f"{chosen['name']} đã cập nhật: {chosen['current']} / {chosen['target']}")
+                    save_task(tasks)
+                
         elif choice == EXIT:
             print("Tạm biệt, chương trình kết thúc!")
             break
 if __name__ == "__main__":
     main()
-
-
-
-   
