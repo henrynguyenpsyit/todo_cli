@@ -33,9 +33,12 @@ FOLDER = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(FOLDER,"todo.json")
 
 
-def add_task(name, tasks, target, unit, level):
+def add_task(name, data, target, unit, level):
     """Thêm task mới vào list"""
-    tasks.append({"name": name, "target": target, "current": 0, "unit": unit, "level": level})
+    new_id = data["next_id"]
+    data["items"].append({"id": f"todo_{new_id}", "name": name, "target": target,
+                          "current": 0, "unit": unit, "level": level})
+    data["next_id"] = data["next_id"] + 1
 
 
 def progress_bar(current, target, color=False):
@@ -73,21 +76,30 @@ def migrate(tasks):
     return tasks
 
 
-def save_task(tasks):
+def save_task(data):
     with open(PATH, "w", encoding="utf-8") as f:
-        json.dump(tasks, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def load_tasks():
     try:
         with open(PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except FileNotFoundError:
-        return []
+        return {"items": [], "next_id": 1}
+    
+    if isinstance(data, list):
+        for i, task in enumerate(data, 1):
+            task["id"] = f"todo_{i}"
+        return {"items": data, "next_id": len(data) + 1}
+    
+    return data
+
     
 
 def main():
-    tasks = load_tasks()
+    data = load_tasks()
+    tasks = data["items"]
     migrate(tasks)
     while True:
         choice = questionary.select(
@@ -120,8 +132,8 @@ def main():
                 choices = ["cao", "trung bình", "thấp"],
                 style=custom_style
             ).ask()
-            add_task(name, tasks, target, unit, level)
-            save_task(tasks)
+            add_task(name, data, target, unit, level)
+            save_task(data)
 
         elif choice == LIST:
             list_tasks(tasks)
@@ -217,7 +229,7 @@ def main():
                                 print("Huỷ xoá")
                         else:
                             break
-                save_task(tasks)
+                save_task(data)
                 
 
         elif choice == UPDATE:
@@ -240,7 +252,7 @@ def main():
                     amount = int(amount)
                     just_done = chosen['current'] < chosen['target'] and chosen['current'] + amount >= chosen['target']
                     update_progress(chosen, amount)
-                    save_task(tasks)
+                    save_task(data)
                     if just_done:
                         printr("🎉🎉🎉[green]Chúc mừng bạn đã hoàn thành task![/]🎉🎉🎉")
                     else:
