@@ -18,26 +18,84 @@ EXIT = "Thoát"
 DEFAULTS = {"target": 1,
             "current": 0,
             "unit": "",
-            "level": "trung bình"
+            "level": "trung bình",
+            "parent_habit": None
 }
 
 LEVEL_COLOR = {
     "cao": "#ff0000",
     "trung bình": "#FFA500",
-    "thấp": "#c9a98c",
+    "thấp": "#96918e",
 }
 
 ORDER = {"cao": 1, "trung bình": 2, "thấp": 3}
 
 FOLDER = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(FOLDER,"todo.json")
+TOOLS_PATH = r"C:\Python\hub_cli\tools.json"
 
+def get_habit_py_path():
+    with open(TOOLS_PATH, "r", encoding="utf-8") as f:
+        tools = json.load(f)
+    for t in tools:
+        if t["name"] == "Habit tracker":
+            return t["path"]
+    return None
 
-def add_task(name, data, target, unit, level):
+def get_habit_json_path():
+    py_path = get_habit_py_path()
+    folder = os.path.dirname(py_path)
+    return os.path.join(folder, "habit.json")
+
+def get_habit_data():
+    path = get_habit_json_path()
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_habit_data(data):
+    path = get_habit_json_path()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def create_new_habit(habit):
+    data = get_habit_data()
+    new_id = data["next_id"]
+    data["items"].append({"id": f"habit_{new_id}","habit": habit, "history": []})
+    data["next_id"] += 1
+    save_habit_data(data)
+    return f"habit_{new_id}"
+    
+
+def choose_habit():
+    data = get_habit_data()
+    habits = data["items"]
+
+    choices = [Choice(h["habit"], value=h["id"]) for h in habits]
+    choices = choices + [Choice("Không link", value="nolink")]
+    choices = choices + [Choice("Habit mới", value="new")]
+    
+    result = questionary.select(
+        "Link với Habit:",
+        choices = choices,
+        style = custom_style
+    ).ask()
+    if result is None or result == "nolink":
+        return None
+    elif result == "new":
+        new = questionary.text("Tên Habit mới:").ask()
+        if new is None:
+            return None
+        new = new.strip()
+        if not new:
+            return None
+        return create_new_habit(new)
+    return result
+
+def add_task(name, data, target, unit, level, parent_habit):
     """Thêm task mới vào list"""
     new_id = data["next_id"]
     data["items"].append({"id": f"todo_{new_id}", "name": name, "target": target,
-                          "current": 0, "unit": unit, "level": level})
+                          "current": 0, "unit": unit, "level": level, "parent_habit": parent_habit})
     data["next_id"] = data["next_id"] + 1
 
 
@@ -95,7 +153,6 @@ def load_tasks():
     
     return data
 
-    
 
 def main():
     data = load_tasks()
@@ -132,7 +189,8 @@ def main():
                 choices = ["cao", "trung bình", "thấp"],
                 style=custom_style
             ).ask()
-            add_task(name, data, target, unit, level)
+            parent = choose_habit()
+            add_task(name, data, target, unit, level, parent)
             save_task(data)
 
         elif choice == LIST:
