@@ -79,7 +79,7 @@ def choose_habit():
         choices = choices,
         style = custom_style
     ).ask()
-    if result is None or result == "nolink":
+    if result is None:
         return None
     elif result == "new":
         new = questionary.text("Tên Habit mới:").ask()
@@ -190,6 +190,8 @@ def main():
                 style=custom_style
             ).ask()
             parent = choose_habit()
+            if parent == "nolink":
+                parent = None
             add_task(name, data, target, unit, level, parent)
             save_task(data)
 
@@ -234,6 +236,7 @@ def main():
                                 Choice("Chỉnh sửa đơn vị", value="unit"),
                                 Choice("Chỉnh sửa ưu tiên", value="level"),
                                 Choice("Xoá task", value="del"),
+                                Choice("Điều chỉnh Habit", value="link"),
                                 Choice("↩️ Quay lại", value="exit")],
                                 style = custom_style,
                             ).ask()
@@ -282,14 +285,36 @@ def main():
                             if confirm:
                                 tasks.remove(chosen)
                                 print(f"Đã xoá {chosen['name']}")
+                                save_task(data)
                                 break
                             else:
                                 print("Huỷ xoá")
+                        elif action == "link":
+                            new_link = questionary.select(
+                                "Điều chỉnh Habit:",
+                                choices = [
+                                    Choice("Huỷ bỏ liên kết", value="nolink"),
+                                    Choice("Thay đổi liên kết Habit / Tạo habit mới", value="change"),
+                                ],
+                                style=custom_style,
+                            ).ask()
+                            if new_link is None:
+                                continue
+                            elif new_link == "nolink":
+                                chosen['parent_habit'] = None
+                            elif new_link == "change":
+                                new_link = choose_habit()
+                                if new_link is None:
+                                    continue
+                                elif new_link == "nolink":
+                                    chosen['parent_habit'] = None
+                                else:
+                                    chosen['parent_habit'] = new_link
                         else:
                             break
-                save_task(data)
+                        save_task(data)
                 
-
+                
         elif choice == UPDATE:
             while True:
                 chosen = questionary.select(
