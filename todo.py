@@ -29,8 +29,8 @@ LEVEL_COLOR = {
     "trung bình": "#FFA500",
     "thấp": "#96918e",
 }
-
 ORDER = {"cao": 1, "trung bình": 2, "thấp": 3}
+HABITS = {}
 
 FOLDER = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(FOLDER,"todo.json")
@@ -97,7 +97,7 @@ def add_task(name, data, target, unit, level, parent_habit):
     """Thêm task mới vào list"""
     new_id = data["next_id"]
     data["items"].append({"id": f"todo_{new_id}", "name": name, "target": target,
-                          "current": 0, "unit": unit, "level": level, "parent_habit": parent_habit})
+                          "current": 0, "unit": unit, "level": level, "parent_habit": parent_habit, "day": ""})
     data["next_id"] = data["next_id"] + 1
 
 def progress_bar(current, target, color=False):
@@ -112,6 +112,7 @@ def progress_bar(current, target, color=False):
 
 def list_tasks(tasks):
     """In ra tất cả task kèm số thứ tự và trạng thái"""
+    habit_names = {h["id"]: h["habit"] for h in get_habit_data()["items"]}
     for i, t in enumerate(tasks, 1):
         current = t["current"]
         target = t["target"]
@@ -120,7 +121,12 @@ def list_tasks(tasks):
         bar = progress_bar(current, target, color=True)
         done = current >= target
         tick = "[#00aa00]✓[/]" if done else " "
-        printr(f"{i}. {tick} [{color}]{t['name']}[/] - {current} / {target} {unit} {bar}")
+        if t["parent_habit"] is None:
+            link_label = ""
+        else:
+            link_label = f"→ {habit_names.get(t['parent_habit'], "???")}"
+
+        printr(f"{i}. {tick} [{color}]{t['name']}[/] - {current} / {target} {unit} {bar} {link_label}")
 
 
 def update_progress(task, amount):
@@ -138,6 +144,23 @@ def reset_daily(data):
             changed = True
     if changed:
         save_task(data)
+
+def auto_checkin (task, tasks):
+    if task["parent_habit"] is None:
+        return None
+    today = date.today().isoformat()
+    siblings = [t for t in tasks if t["parent_habit"] == task["parent_habit"]]
+    for s in siblings:
+        if s["current"] < s["target"] or s["day"] != today:
+            return None
+    habit_data = get_habit_data()
+    for h in habit_data["items"]:
+        if h["id"] == task["parent_habit"]:
+            if today in h["history"]:
+                return None
+            h["history"].append(today)
+            save_habit_data(habit_data)
+        
 
 def migrate(tasks):
     for i, t in enumerate(tasks):
@@ -350,6 +373,7 @@ def main():
                     save_task(data)
                     if just_done:
                         printr("🎉🎉🎉[green]Chúc mừng bạn đã hoàn thành task![/]🎉🎉🎉")
+                        auto_checkin(chosen, tasks)
                     else:
                         print(f"{chosen['name']} đã cập nhật: {chosen['current']} / {chosen['target']}")
                     
