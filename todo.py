@@ -3,6 +3,7 @@ import json
 import os
 from questionary import Style, Choice
 from rich import print as printr
+from datetime import date
 
 custom_style = Style([
     ("pointer", "fg:#ffff00 bold"),
@@ -19,7 +20,8 @@ DEFAULTS = {"target": 1,
             "current": 0,
             "unit": "",
             "level": "trung bình",
-            "parent_habit": None
+            "parent_habit": None,
+            "day": ""
 }
 
 LEVEL_COLOR = {
@@ -98,7 +100,6 @@ def add_task(name, data, target, unit, level, parent_habit):
                           "current": 0, "unit": unit, "level": level, "parent_habit": parent_habit})
     data["next_id"] = data["next_id"] + 1
 
-
 def progress_bar(current, target, color=False):
     LENGTH = 20
     filled = int(current / target * LENGTH)
@@ -119,7 +120,7 @@ def list_tasks(tasks):
         bar = progress_bar(current, target, color=True)
         done = current >= target
         tick = "[#00aa00]✓[/]" if done else " "
-        printr(f"{i}. {tick} [{color}]{t['name']}[/] - {current} / {target} {unit} ({bar})")
+        printr(f"{i}. {tick} [{color}]{t['name']}[/] - {current} / {target} {unit} {bar}")
 
 
 def update_progress(task, amount):
@@ -127,6 +128,16 @@ def update_progress(task, amount):
     task["current"] += amount
     return task
 
+def reset_daily(data):
+    today = date.today().isoformat()
+    changed = False
+    for t in data["items"]:
+        if t["parent_habit"] is not None and t["day"] != today:
+            t["current"] = 0
+            t["day"] = today
+            changed = True
+    if changed:
+        save_task(data)
 
 def migrate(tasks):
     for i, t in enumerate(tasks):
@@ -158,6 +169,7 @@ def main():
     data = load_tasks()
     tasks = data["items"]
     migrate(tasks)
+    reset_daily(data)
     while True:
         choice = questionary.select(
         "____TO-DO LIST____",
