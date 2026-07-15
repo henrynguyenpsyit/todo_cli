@@ -1,6 +1,7 @@
 import questionary
 import json
 import os
+import sys
 from questionary import Style, Choice
 from rich import print as printr
 from datetime import date
@@ -30,13 +31,18 @@ LEVEL_COLOR = {
     "thấp": "#96918e",
 }
 ORDER = {"cao": 1, "trung bình": 2, "thấp": 3}
-HABITS = {}
 
 FOLDER = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(FOLDER,"todo.json")
-TOOLS_PATH = r"C:\Python\hub_cli\tools.json"
+MAIN = os.path.dirname(FOLDER)
+TOOLS_PATH = os.path.join(MAIN, "hub_cli", "tools.json")
 
 def get_habit_py_path():
+    if not os.path.exists(TOOLS_PATH):
+        raise FileNotFoundError(
+            f"Không tìm thấy {TOOLS_PATH}.\n"
+            f"Kiểm tra: 'hub_cli' đã tồn tại trong '{MAIN}' chưa?"
+        )
     with open(TOOLS_PATH, "r", encoding="utf-8") as f:
         tools = json.load(f)
     for t in tools:
@@ -97,7 +103,7 @@ def add_task(name, data, target, unit, level, parent_habit):
     """Thêm task mới vào list"""
     new_id = data["next_id"]
     data["items"].append({"id": f"todo_{new_id}", "name": name, "target": target,
-                          "current": 0, "unit": unit, "level": level, "parent_habit": parent_habit, "day": ""})
+                          "current": 0, "unit": unit, "level": level, "parent_habit": parent_habit, "day": date.today().isoformat()})
     data["next_id"] = data["next_id"] + 1
 
 def progress_bar(current, target, color=False):
@@ -161,6 +167,18 @@ def auto_checkin (task, tasks):
             h["history"].append(today)
             save_habit_data(habit_data)
         
+def ensure_autostart():
+    app_data = os.environ["APPDATA"]
+    startup_path = r"Microsoft\Windows\Start Menu\Programs\Startup"
+    startup = os.path.join(app_data, startup_path)
+    vbs_path = os.path.join(startup, "todo_daily_reset.vbs")
+    if os.path.exists(vbs_path):
+        return
+    pythonw = sys.executable.replace("python.exe", "pythonw.exe")
+    script = os.path.join(FOLDER, "daily_reset.py")
+    content = f'CreateObject("WScript.Shell").Run """{pythonw}"" ""{script}""", 0'
+    with open(vbs_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
 def migrate(tasks):
     for i, t in enumerate(tasks):
@@ -193,6 +211,7 @@ def main():
     tasks = data["items"]
     migrate(tasks)
     reset_daily(data)
+    ensure_autostart()
     while True:
         choice = questionary.select(
         "____TO-DO LIST____",
@@ -293,7 +312,11 @@ def main():
                                 continue
                             else:
                                 new_target = int(new_target)
-                                chosen['target'] = new_target
+                                if new_target <= chosen['current']:
+                                    print("❌ Mục tiêu phải lớn hơn tiến độ hiện tại ❌")
+                                    continue
+                                else:
+                                    chosen['target'] = new_target
                         elif action == "unit":
                             new_unit = questionary.text(
                                 "Nhập đơn vị mới: "
